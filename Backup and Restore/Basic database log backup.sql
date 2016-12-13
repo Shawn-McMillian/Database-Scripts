@@ -5,11 +5,11 @@
 **       and international treaties.
 *******************************************************************************
 **
-** Script Name: Basic database full backup
+** Script Name: Basic database log backup
 **
 ** Created By:  Shawn McMillian
 **
-** Description: Perform a basic database backup, using the default settings. Great for taking a quick backup.
+** Description: Perform a basic database log backup, using the default settings. Great for taking a quick backup.
 **
 ** Databases:   master
 **
@@ -47,7 +47,7 @@ DECLARE @ReturnError int,
 		@BackupName nvarchar(128) = '',
 		@BackupDescription nvarchar(512) = '',
 		@BackupTool nvarchar(32) = 'SQLServer',
-		@BackupExtension char(3) = 'BAK',
+		@BackupExtension char(3) = 'trn',
 		@SQL nvarchar(max) = '',
 		@Debug bit
 
@@ -104,11 +104,11 @@ SELECT	@BackupDirectoryFull = @BackupDirectory + '\' + @DatabaseName,
 									WHEN LOWER(@BackupTool) = LOWER('LiteSpeed') THEN @BackupDirectory + '\%D\%D_%T_%z.' + @BackupExtension
 									ELSE 'Break Me'
 								END,
-		@BackupName = @DatabaseName + '-Full database backup',
-		@BackupDescription = 'Full backup of database [' + @InstanceName + '].[' + @DatabaseName + '] at ' + CAST(@TimeStamp AS nvarchar)
+		@BackupName = @DatabaseName + '-Log database backup',
+		@BackupDescription = 'Log backup of database [' + @InstanceName + '].[' + @DatabaseName + '] at ' + CAST(@TimeStamp AS nvarchar)
 
 --Create a text version of the command to be run
-SET @SQL= 'BACKUP	DATABASE ' + @DatabaseName + '
+SET @SQL= 'BACKUP	LOG ' + @DatabaseName + '
 		TO DISK = ''' + @BackupFileNameFull + '''
 		WITH NOFORMAT, 
 		INIT,
@@ -151,7 +151,7 @@ IF NOT EXISTS(SELECT 1 FROM @SubDirectory WHERE SubDirectory = @DatabaseName)
 --Backup the database
 IF (@Debug = 0)
 	BEGIN
-	BACKUP	DATABASE @DatabaseName
+	BACKUP LOG @DatabaseName
 			TO DISK = @BackupFileNameFull
 			WITH NOFORMAT, 
 			INIT,

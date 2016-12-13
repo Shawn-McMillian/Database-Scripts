@@ -5,11 +5,11 @@
 **       and international treaties.
 *******************************************************************************
 **
-** Script Name: Basic database full backup
+** Script Name: Basic database diff backup
 **
 ** Created By:  Shawn McMillian
 **
-** Description: Perform a basic database backup, using the default settings. Great for taking a quick backup.
+** Description: Perform a basic database diff backup, using the default settings. Great for taking a quick backup.
 **
 ** Databases:   master
 **
@@ -47,7 +47,7 @@ DECLARE @ReturnError int,
 		@BackupName nvarchar(128) = '',
 		@BackupDescription nvarchar(512) = '',
 		@BackupTool nvarchar(32) = 'SQLServer',
-		@BackupExtension char(3) = 'BAK',
+		@BackupExtension char(4) = 'DIFF',
 		@SQL nvarchar(max) = '',
 		@Debug bit
 
@@ -104,13 +104,14 @@ SELECT	@BackupDirectoryFull = @BackupDirectory + '\' + @DatabaseName,
 									WHEN LOWER(@BackupTool) = LOWER('LiteSpeed') THEN @BackupDirectory + '\%D\%D_%T_%z.' + @BackupExtension
 									ELSE 'Break Me'
 								END,
-		@BackupName = @DatabaseName + '-Full database backup',
-		@BackupDescription = 'Full backup of database [' + @InstanceName + '].[' + @DatabaseName + '] at ' + CAST(@TimeStamp AS nvarchar)
+		@BackupName = @DatabaseName + '-Diff database backup',
+		@BackupDescription = 'Diff backup of database [' + @InstanceName + '].[' + @DatabaseName + '] at ' + CAST(@TimeStamp AS nvarchar)
 
 --Create a text version of the command to be run
 SET @SQL= 'BACKUP	DATABASE ' + @DatabaseName + '
 		TO DISK = ''' + @BackupFileNameFull + '''
-		WITH NOFORMAT, 
+		WITH DIFFERENTIAL,
+		NOFORMAT, 
 		INIT,
 		NAME = ''' + @BackupName + ''',
 		DESCRIPTION = ''' + @BackupDescription + ''',
@@ -153,7 +154,8 @@ IF (@Debug = 0)
 	BEGIN
 	BACKUP	DATABASE @DatabaseName
 			TO DISK = @BackupFileNameFull
-			WITH NOFORMAT, 
+			WITH DIFFERENTIAL,
+			NOFORMAT, 
 			INIT,
 			NAME = @BackupName,
 			DESCRIPTION = @BackupDescription,
