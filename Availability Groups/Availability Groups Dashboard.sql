@@ -45,7 +45,9 @@ SELECT  AG.name AS [AGName],
         AR.availability_mode_desc AS [CommitType],
         AR.failover_mode_desc [FailoverMode],
         ARS.synchronization_health_desc AS [Health],
-		'ALTER AVAILABILITY GROUP ' + AG.name + ' FAILOVER;' AS [Failover]
+		'ALTER AVAILABILITY GROUP ' + AG.name + ' FAILOVER;' AS [Failover],
+		(SELECT 'ALTER ENDPOINT ' + [name] + ' STATE = STOPPED;' FROM sys.endpoints WHERE [type] = 4) AS [StopEndpoint],
+		(SELECT 'ALTER ENDPOINT ' + [name] + ' STATE = STARTED;' FROM sys.endpoints WHERE [type] = 4) AS [StartEndpoint]
 FROM sys.availability_groups AS AG
     JOIN sys.availability_replicas AS AR ON AG.group_id = AR.group_id
     JOIN sys.dm_hadr_availability_replica_states AS ARS  ON AR.replica_id = ARS.replica_id
