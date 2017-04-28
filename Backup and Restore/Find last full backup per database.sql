@@ -25,7 +25,17 @@
 SELECT	D.[name] AS [DatabaseName],
 		BS.backup_finish_date AS [BackupFinishDate],
 		BMF.physical_device_name AS [BackupFileName],
-		BMF.family_sequence_number AS [Sequence]
+		BMF.family_sequence_number AS [Sequence],
+		'USE [master];' + CHAR(13) + CHAR(10) +
+		'GO' + CHAR(13) + CHAR(10) +
+		'EXECUTE AS LOGIN = ''sa''' + CHAR(13) + CHAR(10) +
+		'GO' + CHAR(13) + CHAR(10) +
+		'RESTORE DATABASE [' + D.[name] + ']' + CHAR(13) + CHAR(10) +
+		'FROM  DISK = N''' + BMF.physical_device_name + '''' + CHAR(13) + CHAR(10) +
+		'WITH  FILE = 1,' + CHAR(13) + CHAR(10) +
+		'NORECOVERY,' + CHAR(13) + CHAR(10) +
+		'NOUNLOAD,' + CHAR(13) + CHAR(10) +
+		'STATS = 5' AS [SimpleRestore]
 FROM [master].[sys].[databases] AS D 
 	JOIN [msdb].[dbo].[backupset] AS BS ON (D.name = BS.database_name)
 	JOIN [msdb].[dbo].[backupmediaset] AS BMS ON (BS.media_set_id = BMS.media_set_id)
