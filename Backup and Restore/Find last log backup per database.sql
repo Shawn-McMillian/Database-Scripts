@@ -25,7 +25,14 @@
 SELECT	D.[name] AS [DatabaseName],
 		BS.backup_finish_date AS [BackupFinishDate],
 		BMF.physical_device_name AS [BackupFileName],
-		BMF.family_sequence_number AS [Sequence]
+		BMF.family_sequence_number AS [Sequence],
+		'USE [master];' + CHAR(13) + CHAR(10) +
+		'RESTORE LOG [' + D.[name] + ']' + CHAR(13) + CHAR(10) +
+		'FROM  DISK = N''' + BMF.physical_device_name + '''' + CHAR(13) + CHAR(10) +
+		'WITH  FILE = 1,' + CHAR(13) + CHAR(10) +
+		'NORECOVERY,' + CHAR(13) + CHAR(10) +
+		'NOUNLOAD,' + CHAR(13) + CHAR(10) +
+		'STATS = 5' AS [SimpleRestore]
 FROM [master].[sys].[databases] AS D 
 	JOIN [msdb].[dbo].[backupset] AS BS ON (D.name = BS.database_name)
 	JOIN [msdb].[dbo].[backupmediaset] AS BMS ON (BS.media_set_id = BMS.media_set_id)
@@ -36,6 +43,6 @@ FROM [master].[sys].[databases] AS D
 				JOIN [msdb].[dbo].[backupset] AS BS ON (D.name = BS.database_name)
 				JOIN [msdb].[dbo].[backupmediaset] AS BMS ON (BS.media_set_id = BMS.media_set_id)
 				JOIN [msdb].[dbo].[backupmediafamily] AS BMF ON (BMS.media_set_id = BMF.media_set_id)
-			WHERE BS.[Type] = 'I'
+			WHERE BS.[Type] = 'L'
 			GROUP BY D.[name]) AS T ON D.[name] = T.DatabaseName AND BS.backup_set_id = T.backup_set_id
-WHERE BS.[Type] = 'I';
+WHERE BS.[Type] = 'L';
