@@ -56,8 +56,8 @@ DECLARE @SubDirectory TABLE(SubDirectory nvarchar(512));
 --*************************************************************************************
 --****								Change me!!  								   ****
 --*************************************************************************************
-SET @DatabaseName = 'master' --change me to the database you want to backup
-SET @Debug = 1 --Change to 0 (zero) to take the backup.
+SET @DatabaseName = 'Docusign_Partition_0001' --change me to the database you want to backup
+SET @Debug = 0 --Change to 0 (zero) to take the backup.
 
 
 --*************************************************************************************
