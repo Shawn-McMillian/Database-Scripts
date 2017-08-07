@@ -5,7 +5,7 @@
 **       and international treaties.
 *******************************************************************************
 **
-** Script Name: XEvent Procedure Trace
+** Script Name: XEvent Procedure Trace for a database
 **
 ** Created By:  Shawn McMillian
 **
