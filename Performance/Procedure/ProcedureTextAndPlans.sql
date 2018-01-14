@@ -39,6 +39,6 @@ FROM sys.dm_exec_cached_plans  AS CP
 	CROSS APPLY sys.dm_exec_query_plan(plan_handle) AS QP
 WHERE DB_NAME(ST.dbid) <> 'Resource'
 --AND OBJECT_SCHEMA_NAME(ST.objectid,ST.dbid) = 'SchemaNamegoesHere'
---AND OBJECT_NAME(ST.objectid,dbid) = 'NameOfProcGoesHere'
+--AND OBJECT_NAME(ST.objectid,ST.dbid) = 'NameOfProcGoesHere'
 ORDER BY UseCounts DESC
 
