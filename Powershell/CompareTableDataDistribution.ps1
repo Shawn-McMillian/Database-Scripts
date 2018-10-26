@@ -21,15 +21,13 @@
 <#******************************************************************************
 **	                             Functions		                        	  ** 
 ******************************************************************************#>
-function Test-SQLConnection #Check to see if the SQL Server provided can be connected to.
+function Test-SQLConnectionString #Check to see if the SQL Server provided can be connected to.
 {    
     [OutputType([bool])]
     Param
-    (
-        [Parameter(Mandatory=$true,
-                    ValueFromPipelineByPropertyName=$true,
-                    Position=0)]
-        $ConnectionString
+    (    
+        [Parameter( Mandatory=$true)] 
+        [string]$ConnectionString
     )
     try
     {
@@ -47,7 +45,7 @@ function Test-SQLConnection #Check to see if the SQL Server provided can be conn
     }
 } #End Test-SQLConnection
 
-function Check-TargetDirectory #Checks to see if the $TargetDirectory exists, optionally creates if not
+function Find-TargetDirectory #Checks to see if the $TargetDirectory exists, optionally creates if not
 {
 	[CmdletBinding()]
 	param (	[parameter(Mandatory = $true)]
@@ -59,8 +57,6 @@ function Check-TargetDirectory #Checks to see if the $TargetDirectory exists, op
 	if (Test-Path $TargetDirectory)
 	{
 		Write-Host "Passed" -ForegroundColor "Green"
-		#Write-Verbose "Target directory: $TargetDirectory exists";
-		[bool]$global:TargetDirectoryExists = $true
 	}
 	else
 	{
@@ -79,7 +75,7 @@ function Check-TargetDirectory #Checks to see if the $TargetDirectory exists, op
 	}
 } #End Check-TargetDirectory
 
-function Create-SQLConnectionString #Creates the connection string from the values provided
+function New-SQLConnectionString #Creates the connection string from the values provided
 {
 	[CmdletBinding()]
 	param (	[parameter(Mandatory = $true)]
@@ -87,15 +83,15 @@ function Create-SQLConnectionString #Creates the connection string from the valu
 			[parameter(Mandatory = $true)]
 			[string]$DatabaseName,
 			[parameter(Mandatory = $true)]
-			[bool]$TrustedConnection = $true,
+			[bool]$TrustedConnection,
 			[parameter(Mandatory = $true)]
 			[string]$UserName,
 			[parameter(Mandatory = $true)]
 			[string]$Password,
 			[parameter(Mandatory = $true)]
-			[bool]$MultiSubnetFailover = $false,
+			[bool]$MultiSubnetFailover,
 			[parameter(Mandatory = $true)]
-			[bool]$ApplicationIntent = $false
+			[bool]$ApplicationIntent
 	)
 	
 	#Set the server and database portion of the string
@@ -137,7 +133,7 @@ function Create-SQLConnectionString #Creates the connection string from the valu
 	Return $connectionString
 } #End Create-SQLConnectionString
 
-function Create-Table #Creates a dataset from the provided parameters
+function New-Table #Creates a dataset from the provided parameters
 {
 	[CmdletBinding()]
 	param (	[parameter(Mandatory = $true)]
@@ -159,7 +155,7 @@ function Create-Table #Creates a dataset from the provided parameters
         $command = New-Object System.Data.SqlClient.SqlCommand
         $command.CommandText = $TableQuery
         $command.Connection = $Connection
-        $command.CommandTimeout = 120
+        $command.CommandTimeout = 240
         
         #Create the adapter and table
         $SqlAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
@@ -170,7 +166,7 @@ function Create-Table #Creates a dataset from the provided parameters
         #Fill the adapter and table
         $RowsAffected = $SqlAdapter.Fill($DataSet)
         $Table = $DataSet.Tables[0]
-        
+    
         #Stop the stopwatch and capture the duration
         $sw.Stop()
         $QueryDuration = $sw.Elapsed
@@ -196,250 +192,42 @@ function Create-Table #Creates a dataset from the provided parameters
 
         return ,$Table
 } #End Create-Table
-
-function AddItemProperties($item, $properties, $output)
-{
-    if($item -ne $null)
-    {
-        foreach($property in $properties)
-        {
-            $propertyHash =$property -as [hashtable]
-            if($propertyHash -ne $null)
-            {
-                $hashName=$propertyHash["name"] -as [string]
-                if($hashName -eq $null)
-                {
-                    throw "there should be a string Name"  
-                }
-         
-                $expression=$propertyHash["expression"] -as [scriptblock]
-                if($expression -eq $null)
-                {
-                    throw "there should be a ScriptBlock Expression"  
-                }
-         
-                $_=$item
-                $expressionValue=& $expression
-         
-                $output | add-member -MemberType "NoteProperty" -Name $hashName -Value $expressionValue
-            }
-            else
-            {
-                # .psobject.Properties allows you to list the properties of any object, also known as "reflection"
-                foreach($itemProperty in $item.psobject.Properties)
-                {
-                    if ($itemProperty.Name -like $property)
-                    {
-                        $output | add-member -MemberType "NoteProperty" -Name $itemProperty.Name -Value $itemProperty.Value
-                    }
-                }
-            }
-        }
-    }
-} #End AddItemProperties
-
-    
-function WriteJoinObjectOutput($leftItem, $rightItem, $leftProperties, $rightProperties, $Type)
-{
-    $output = new-object psobject
-
-    if($Type -eq "AllInRight")
-    {
-        # This mix of rightItem with LeftProperties and vice versa is due to
-        # the switch of Left and Right arguments for AllInRight
-        AddItemProperties $rightItem $leftProperties $output
-        AddItemProperties $leftItem $rightProperties $output
-    }
-    else
-    {
-        AddItemProperties $leftItem $leftProperties $output
-        AddItemProperties $rightItem $rightProperties $output
-    }
-    $output
-} #WriteJoinObjectOutput
-
-function Join-Object
-{
-    [CmdletBinding()]
-    [OutputType([int])]
-    Param
-    (
-        # List to join with $Right
-        [Parameter(Mandatory=$true,
-                   Position=0)]
-        [object[]]
-        $Left,
-
-        # List to join with $Left
-        [Parameter(Mandatory=$true,
-                   Position=1)]
-        [object[]]
-        $Right,
-
-        # Condition in which an item in the left matches an item in the right
-        # typically something like: {$args[0].Id -eq $args[1].Id}
-        [Parameter(Mandatory=$true,
-                   Position=2)]
-        [scriptblock]
-        $Where,
-
-        # Properties from $Left we want in the output.
-        # Each property can:
-        # – Be a plain property name like "Name"
-        # – Contain wildcards like "*"
-        # – Be a hashtable like @{Name="Product Name";Expression={$_.Name}}. Name is the output property name
-        #   and Expression is the property value. The same syntax is available in select-object and it is 
-        #   important for join-object because joined lists could have a property with the same name
-        [Parameter(Mandatory=$true,
-                   Position=3)]
-        [object[]]
-        $LeftProperties,
-
-        # Properties from $Right we want in the output.
-        # Like LeftProperties, each can be a plain name, wildcard or hashtable. See the LeftProperties comments.
-        [Parameter(Mandatory=$true,
-                   Position=4)]
-        [object[]]
-        $RightProperties,
-
-        # Type of join. 
-        #   AllInLeft will have all elements from Left at least once in the output, and might appear more than once
-        # if the where clause is true for more than one element in right, Left elements with matches in Right are 
-        # preceded by elements with no matches. This is equivalent to an outer left join (or simply left join) 
-        # SQL statement.
-        #  AllInRight is similar to AllInLeft.
-        #  OnlyIfInBoth will cause all elements from Left to be placed in the output, only if there is at least one
-        # match in Right. This is equivalent to a SQL inner join (or simply join) statement.
-        #  AllInBoth will have all entries in right and left in the output. Specifically, it will have all entries
-        # in right with at least one match in left, followed by all entries in Right with no matches in left, 
-        # followed by all entries in Left with no matches in Right.This is equivallent to a SQL full join.
-        [Parameter(Mandatory=$false,
-                   Position=5)]
-        [ValidateSet("AllInLeft","OnlyIfInBoth","AllInBoth", "AllInRight")]
-        [string]
-        $Type="OnlyIfInBoth"
-    )
-
-    Begin
-    {
-        # a list of the matches in right for each object in left
-        $leftMatchesInRight = new-object System.Collections.ArrayList
-
-        # the count for all matches  
-        $rightMatchesCount = New-Object "object[]" $Right.Count
-
-        for($i=0;$i -lt $Right.Count;$i++)
-        {
-            $rightMatchesCount[$i]=0
-        }
-    }
-
-    Process
-    {
-        if($Type -eq "AllInRight")
-        {
-            # for AllInRight we just switch Left and Right
-            $aux = $Left
-            $Left = $Right
-            $Right = $aux
-        }
-
-        # go over items in $Left and produce the list of matches
-        foreach($leftItem in $Left)
-        {
-            $leftItemMatchesInRight = new-object System.Collections.ArrayList
-            $null = $leftMatchesInRight.Add($leftItemMatchesInRight)
-
-            for($i=0; $i -lt $right.Count;$i++)
-            {
-                $rightItem=$right[$i]
-
-                if($Type -eq "AllInRight")
-                {
-                    # For AllInRight, we want $args[0] to refer to the left and $args[1] to refer to right,
-                    # but since we switched left and right, we have to switch the where arguments
-                    $whereLeft = $rightItem
-                    $whereRight = $leftItem
-                }
-                else
-                {
-                    $whereLeft = $leftItem
-                    $whereRight = $rightItem
-                }
-
-                if(Invoke-Command -ScriptBlock $where -ArgumentList $whereLeft,$whereRight)
-                {
-                    $null = $leftItemMatchesInRight.Add($rightItem)
-                    $rightMatchesCount[$i]++
-                }
-            
-            }
-        }
-
-        # go over the list of matches and produce output
-        for($i=0; $i -lt $left.Count;$i++)
-        {
-            $leftItemMatchesInRight=$leftMatchesInRight[$i]
-            $leftItem=$left[$i]
-                               
-            if($leftItemMatchesInRight.Count -eq 0)
-            {
-                if($Type -ne "OnlyIfInBoth")
-                {
-                    WriteJoinObjectOutput $leftItem  $null  $LeftProperties  $RightProperties $Type
-                }
-
-                continue
-            }
-
-            foreach($leftItemMatchInRight in $leftItemMatchesInRight)
-            {
-                WriteJoinObjectOutput $leftItem $leftItemMatchInRight  $LeftProperties  $RightProperties $Type
-            }
-        }
-    }
-
-    End
-    {
-        #produce final output for members of right with no matches for the AllInBoth option
-        if($Type -eq "AllInBoth")
-        {
-            for($i=0; $i -lt $right.Count;$i++)
-            {
-                $rightMatchCount=$rightMatchesCount[$i]
-                if($rightMatchCount -eq 0)
-                {
-                    $rightItem=$Right[$i]
-                    WriteJoinObjectOutput $null $rightItem $LeftProperties $RightProperties $Type
-                }
-            }
-        }
-    }
-} #end Join-Object
-
+  
 <#******************************************************************************
 **	                             Script		                        	      ** 
 ******************************************************************************#>
-Clear
+Clear-Host
 $ErrorActionPreference="Stop"
 Write-Host "Starting" -ForegroundColor "Gray"
 
-$SourceQuery = "IF(OBJECT_ID('tempdb.dbo.#Range') IS NULL)
+$SourceQuery = "SET NOCOUNT ON;
+
+--Create the temp tables
+IF(OBJECT_ID('tempdb.dbo.#Range') IS NOT NULL)
 	BEGIN
-	CREATE TABLE #Range (StartValue bigint, EndValue bigint)
-	END
-ELSE
-	BEGIN
-	TRUNCATE TABLE #Range
+	DROP TABLE #Range
 	END
 
+CREATE TABLE #Range (StartValue bigint, EndValue bigint)
+
+
+IF(OBJECT_ID('tempdb.dbo.#RowModVersion') IS NOT NULL)
+	BEGIN
+	DROP TABLE #RowModVersion
+	END
+
+CREATE TABLE #RowModVersion (RowModVersion bigint)
+
+--Declare the locals
 DECLARE @Start bigint = 0,
 		@End bigint,
 		@BatchSize bigint = 1000000,
 		@NextValue bigint
 
-SELECT @End = (SELECT MAX(RowModVersion) FROM Envelope WITH(INDEX(IX_Envelope_RowModVersion)));
+--Get the max rowmodversion from the table
+SELECT @End = (SELECT MAX(RowModVersion) FROM dbo.Envelope WITH(INDEX(IX_Envelope_RowModVersion)));
 
+--Create the histogram buckets
 WHILE @Start <= @End
 	BEGIN
 	SET @NextValue = @Start + @BatchSize
@@ -447,8 +235,18 @@ WHILE @Start <= @End
 	SET @Start = @NextValue
 	END
 
-SELECT R.StartValue, COUNT(*) AS [SourceCount], '' AS [SourceDelta]
-FROM Envelope AS W
+--Insert the values from the table into a temp table, to make sure we get a good index hit.
+INSERT INTO #RowModVersion (RowModVersion)
+SELECT RowModVersion
+FROM dbo.Envelope;
+
+--Index the tables for speed.
+CREATE INDEX IDX_#Range_StartEnd ON #Range(StartValue, EndValue)
+CREATE INDEX IDX_#RowModVersion_RowModVersion ON #RowModVersion(RowModVersion)
+
+--Return the results
+SELECT  R.StartValue,COUNT(*) AS [Count], CAST(0 AS INT) AS [SourceDelta]
+FROM #RowModVersion AS W 
 	JOIN #Range AS R ON W.RowModVersion BETWEEN R.StartValue AND R.EndValue
 GROUP BY R.StartValue
 ORDER BY R.StartValue"
@@ -476,65 +274,76 @@ WHILE @Start <= @End
 	SET @Start = @NextValue
 	END
 
-CREATE INDEX IDX_#Range_Test ON #Range(StartValue, EndValue)
-
-SELECT RowModVersion INTO #Temp1 FROM Envelope
-
-CREATE INDEX IDX_#Temp1_Test ON #Temp1(RowModVersion) 
-
-SELECT R.StartValue, COUNT(*) AS [TargetCount], '' AS [TargetDelta]
-FROM #Temp1 AS W 
+SELECT  R.StartValue,COUNT(*) AS [Count],0 AS [TargetDelta]
+FROM Envelope AS W
 	JOIN #Range AS R ON W.RowModVersion BETWEEN R.StartValue AND R.EndValue
 GROUP BY R.StartValue
 ORDER BY R.StartValue"
 
 #Construct a connection string to the Source
 Write-Host -NoNewLine "	Create the connection string to the source: " -ForegroundColor "Gray"
-$ValidConnectionStringSource = (Create-SQLConnectionString -SqlServerName "AGLHQTEST0.hqtest.tst,46926" -DatabaseName "Docusign" -TrustedConnection $true -UserName "Username" -Password "Password" -MultiSubnetFailover $False -ApplicationIntent $False)
+$ValidConnectionStringSource = (New-SQLConnectionString -SqlServerName "AGLHQTEST0.hqtest.tst,46926" -DatabaseName "Docusign" -TrustedConnection $true -UserName "Username" -Password "Password" -MultiSubnetFailover $False -ApplicationIntent $False)
 
 #Construct a connection string to the Target
 Write-Host -NoNewLine "	Create the connection string to the target: " -ForegroundColor "Gray"
-$ValidConnectionStringTarget = (Create-SQLConnectionString -SqlServerName "AGLHQTEST0.hqtest.tst,46926" -DatabaseName "EnvelopeSearch" -TrustedConnection $true -UserName "Username" -Password "Password" -MultiSubnetFailover $False -ApplicationIntent $False)
+$ValidConnectionStringTarget = (New-SQLConnectionString -SqlServerName "AGLHQTEST0.hqtest.tst,46926" -DatabaseName "EnvelopeSearch" -TrustedConnection $true -UserName "Username" -Password "Password" -MultiSubnetFailover $False -ApplicationIntent $False)
 
 #Validate SQL Server instance source
 Write-Host -NoNewLine "	Validating SQL Instance Source: " -ForegroundColor "Gray"
-$ValidSQLConnection = (Test-SQLConnection -ConnectionString $ValidConnectionStringSource)
+$ValidSQLConnection = (Test-SQLConnectionString -ConnectionString $ValidConnectionStringSource)
+if($ValidSQLConnection -eq $false) {Exit}
 
 #Validate SQL Server instance target
 Write-Host -NoNewLine "	Validating SQL Instance Source: " -ForegroundColor "Gray"
-$ValidSQLConnection = (Test-SQLConnection -ConnectionString $ValidConnectionStringTarget)
+$ValidSQLConnection = (Test-SQLConnectionString -ConnectionString $ValidConnectionStringTarget)
+if($ValidSQLConnection -eq $false) {Exit}
 
 #Validate the Export directory exists, and we can access it
 Write-Host -NoNewLine "	Validating Export Directory: " -ForegroundColor "Gray"
-$ValidExportDirectory = (Check-TargetDirectory -TargetDirectory "C:\Temp" -CreateIfMissing $true) 
+$ValidExportDirectory = (Find-TargetDirectory -TargetDirectory "C:\Temp" -CreateIfMissing $true) 
 if ($ValidExportDirectory -eq $false) {Exit}
 
 #Execute the Source query
 Write-Host -NoNewLine "	Running Source Query: " -ForegroundColor "Gray"
-$SourceTable = (Create-Table -TableConnectionString $ValidConnectionStringSource -TableQuery $SourceQuery)
-#$SourceTable | format-table -auto > "C:\Temp\SourceQuery"
+$SourceTable = (New-Table -TableConnectionString $ValidConnectionStringSource -TableQuery $SourceQuery)
 
 #Execute the Target query
 Write-Host -NoNewLine "	Running Target Query: " -ForegroundColor "Gray"
-$TargetTable = (Create-Table -TableConnectionString $ValidConnectionStringTarget -TableQuery $TargetQuery)
-#$TargetTable | format-table -auto > "C:\Temp\TargetQuery"
+$TargetTable = (New-Table -TableConnectionString $ValidConnectionStringTarget -TableQuery $TargetQuery)
 
-#Join the tables 
-Write-Host -NoNewLine "	Merging queries: " -ForegroundColor "Gray"
-$TableResults = join-object -Left $SourceTable -Right $TargetTable -Where {$args[0].StartValue -eq $args[1].StartValue}  -Type AllInBoth -LeftProperties  StartValue, SourceCount, SourceDelta -RightProperties TargetCount, TargetDelta
-#$TableResults | format-table -auto > "C:\Temp\CombinedQuery"
-Write-Host "Passed" -ForegroundColor "Green"
+#Merge the tables 
+Write-Host -NoNewLine "	Merging results: " -ForegroundColor "Gray"
+try     {
+            $ResultTable = new-object system.data.datatable
+            [void]$ResultTable.Columns.Add("RowModVersionBucket", [Double])
+            [void]$ResultTable.Columns.Add("SourceCount", [Double])
+            [void]$ResultTable.Columns.Add("TargetCount", [Double])
+            [void]$ResultTable.Columns.Add("SourceDelta", [Double])
+            [void]$ResultTable.Columns.Add("TargetDelta", [Double])
 
-#Walk the results and calculate the Delta
-Write-Host -NoNewLine "	Calculating Delta: " -ForegroundColor "Gray"
-foreach ($row in $TableResults)
-    {
-        $row.SourceDelta = [int]$row.SourceCount - [int]$row.TargetCount
-        $row.TargetDelta = [int]$row.TargetCount - [int]$row.SourceCount
-    }
-
-$TableResults | export-csv "C:\Temp\CombinedResults.csv" -notypeinformation
-Write-Host "Passed" -ForegroundColor "Green"
-
+            foreach ($row in $SourceTable)
+                {
+                foreach ($Result in $TargetTable)
+                    {
+                        if($row.StartValue -eq $result.StartValue)
+                            {
+                                $NewRow = $ResultTable.NewRow()
+                                $NewRow.RowModVersionBucket = $row.StartValue
+                                $NewRow.SourceCount = $row.Count
+                                $NewRow.TargetCount = $result.Count
+                                $NewRow.SourceDelta = [int]$row.Count - [int]$result.Count
+                                $NewRow.TargetDelta = [int]$result.Count - [int]$row.Count
+                                $ResultTable.Rows.Add($NewRow)
+                            }
+                    }
+                }
+                
+            $ResultTable | Format-Table -AutoSize | Out-File -FilePath "C:\Temp\ResultTable.txt"
+        
+            Write-Host "Passed" -ForegroundColor "Green"
+        }
+catch   {
+            Write-Host "Failed" -ForegroundColor "Red"
+        }
 
 Write-Host "Finished" -ForegroundColor "Gray"
