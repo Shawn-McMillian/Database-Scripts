@@ -192,15 +192,19 @@ function New-Table #Creates a dataset from the provided parameters
 
         return ,$Table
 } #End Create-Table
-  
-<#******************************************************************************
-**	                             Script		                        	      ** 
-******************************************************************************#>
-Clear-Host
-$ErrorActionPreference="Stop"
-Write-Host "Starting" -ForegroundColor "Gray"
 
-$SourceQuery = "SET NOCOUNT ON;
+function New-DynamicSourceQuery #Creates the query to use on the source system
+{
+	[CmdletBinding()]
+	param (	[parameter(Mandatory = $true)]
+			[string]$TableName,
+			[parameter(Mandatory = $true)]
+			[string]$IndexHint
+	)
+	
+	try 
+	{
+		$DynamicSourceQuery = "SET NOCOUNT ON;
 
 --Create the temp tables
 IF(OBJECT_ID('tempdb.dbo.#Range') IS NOT NULL)
@@ -225,7 +229,7 @@ DECLARE @Start bigint = 0,
 		@NextValue bigint
 
 --Get the max rowmodversion from the table
-SELECT @End = (SELECT MAX(RowModVersion) FROM dbo.Envelope WITH(INDEX(IX_Envelope_RowModVersion)));
+SELECT @End = (SELECT MAX(RowModVersion) FROM $TableName WITH(INDEX($IndexHint)));
 
 --Create the histogram buckets
 WHILE @Start <= @End
@@ -238,7 +242,7 @@ WHILE @Start <= @End
 --Insert the values from the table into a temp table, to make sure we get a good index hit.
 INSERT INTO #RowModVersion (RowModVersion)
 SELECT RowModVersion
-FROM dbo.Envelope;
+FROM $TableName WITH(INDEX($IndexHint));
 
 --Index the tables for speed.
 CREATE INDEX IDX_#Range_StartEnd ON #Range(StartValue, EndValue)
@@ -251,22 +255,57 @@ FROM #RowModVersion AS W
 GROUP BY R.StartValue
 ORDER BY R.StartValue"
 
-$TargetQuery = "IF(OBJECT_ID('tempdb.dbo.#Range') IS NULL)
+		 #Write the message and error to the stack and bail out
+		 Write-Host "Passed" -ForegroundColor "Green"
+	}
+	catch 
+	{
+		 #Write the message and error to the stack and bail out
+		 Write-Host "Failed" -ForegroundColor "Red"
+	}
+
+
+Return $DynamicSourceQuery
+} #End New-DynamicSourceQuery
+
+function New-DynamicTargetQuery #Creates the query to use on the source system
+{
+	[CmdletBinding()]
+	param (	[parameter(Mandatory = $true)]
+			[string]$TableName,
+			[parameter(Mandatory = $true)]
+			[string]$IndexHint
+	)
+	try 
+	{
+		$DynamicTargetQuery = "SET NOCOUNT ON;
+
+--Create the temp tables
+IF(OBJECT_ID('tempdb.dbo.#Range') IS NOT NULL)
 	BEGIN
-	CREATE TABLE #Range (StartValue bigint, EndValue bigint)
-	END
-ELSE
-	BEGIN
-	TRUNCATE TABLE #Range
+	DROP TABLE #Range
 	END
 
+CREATE TABLE #Range (StartValue bigint, EndValue bigint)
+
+
+IF(OBJECT_ID('tempdb.dbo.#RowModVersion') IS NOT NULL)
+	BEGIN
+	DROP TABLE #RowModVersion
+	END
+
+CREATE TABLE #RowModVersion (RowModVersion bigint)
+
+--Declare the locals
 DECLARE @Start bigint = 0,
 		@End bigint,
 		@BatchSize bigint = 1000000,
 		@NextValue bigint
 
-SELECT @End = (SELECT MAX(RowModVersion) FROM Envelope WITH(INDEX(IX_Envelope_RowModVersion)));
+--Get the max rowmodversion from the table
+SELECT @End = (SELECT MAX(RowModVersion) FROM $TableName WITH(INDEX($IndexHint)));
 
+--Create the histogram buckets
 WHILE @Start <= @End
 	BEGIN
 	SET @NextValue = @Start + @BatchSize
@@ -274,11 +313,76 @@ WHILE @Start <= @End
 	SET @Start = @NextValue
 	END
 
-SELECT  R.StartValue,COUNT(*) AS [Count],0 AS [TargetDelta]
-FROM Envelope AS W
+--Insert the values from the table into a temp table, to make sure we get a good index hit.
+INSERT INTO #RowModVersion (RowModVersion)
+SELECT RowModVersion
+FROM $TableName WITH(INDEX($IndexHint));
+
+--Index the tables for speed.
+CREATE INDEX IDX_#Range_StartEnd ON #Range(StartValue, EndValue)
+CREATE INDEX IDX_#RowModVersion_RowModVersion ON #RowModVersion(RowModVersion)
+
+--Return the results
+SELECT  R.StartValue,COUNT(*) AS [Count], CAST(0 AS INT) AS [SourceDelta]
+FROM #RowModVersion AS W 
 	JOIN #Range AS R ON W.RowModVersion BETWEEN R.StartValue AND R.EndValue
 GROUP BY R.StartValue
 ORDER BY R.StartValue"
+
+		 #Write the message and error to the stack and bail out
+		 Write-Host "Passed" -ForegroundColor "Green"
+	}
+	catch 
+	{
+		 #Write the message and error to the stack and bail out
+		 Write-Host "Failed" -ForegroundColor "Red"
+	}
+
+	Return $DynamicTargetQuery
+} #end New-DynamicTargetQuery
+
+function Invoke-TableCompare #Creates a dataset from the provided parameters
+{
+	[CmdletBinding()]
+	param (	[parameter(Mandatory = $true)]
+			[string]$SourceConnectionString,
+			[parameter(Mandatory = $true)]
+			[string]$TargetConnectionString,
+			[parameter(Mandatory = $true)]
+			[string]$QuerySource,
+			[parameter(Mandatory = $true)]
+			[string]$QuueryTarget
+	    )
+
+    
+    try 
+    {
+        #Execute the Source query
+		Write-Host -NoNewLine "	Running Source Query: " -ForegroundColor "Gray"
+		$SourceTable = (New-Table -TableConnectionString $ValidConnectionStringSource -TableQuery $SourceQuery)
+
+		#Execute the Target query
+		Write-Host -NoNewLine "	Running Target Query: " -ForegroundColor "Gray"
+		$TargetTable = (New-Table -TableConnectionString $ValidConnectionStringTarget -TableQuery $TargetQuery)
+    }
+    catch
+    {
+        
+    }
+    finally
+    {
+        
+    }
+
+     return ,$Table
+} #End Create-Table
+
+<#******************************************************************************
+**	                             Script		                        	      ** 
+******************************************************************************#>
+Clear-Host
+$ErrorActionPreference="Stop"
+Write-Host "Starting" -ForegroundColor "Gray"
 
 #Construct a connection string to the Source
 Write-Host -NoNewLine "	Create the connection string to the source: " -ForegroundColor "Gray"
@@ -302,6 +406,16 @@ if($ValidSQLConnection -eq $false) {Exit}
 Write-Host -NoNewLine "	Validating Export Directory: " -ForegroundColor "Gray"
 $ValidExportDirectory = (Find-TargetDirectory -TargetDirectory "C:\Temp" -CreateIfMissing $true) 
 if ($ValidExportDirectory -eq $false) {Exit}
+
+#Construct a source query
+Write-Host -NoNewLine "	Constructing Source Query: " -ForegroundColor "Gray"
+$SourceQuery = (New-DynamicSourceQuery -TableName "[dbo].[Activation]" -IndexHint "IX_Activation_RowModVersion" )
+if ($SourceQuery -eq $false) {Exit}
+
+#Construct a target query
+Write-Host -NoNewLine "	Constructing Target Query: " -ForegroundColor "Gray"
+$TargetQuery = (New-DynamicTargetQuery -TableName "[dbo].[Activation]" -IndexHint "IX_Activation_RowModVersion" )
+if ($TargetQuery -eq $false) {Exit}
 
 #Execute the Source query
 Write-Host -NoNewLine "	Running Source Query: " -ForegroundColor "Gray"

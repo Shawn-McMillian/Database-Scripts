@@ -206,12 +206,12 @@ $connection =  New-Object System.Data.SqlClient.SqlConnection
     $DataSet = New-Object System.Data.DataSet
     $RowsAffected = $SqlAdapter.Fill($DataSet)
     
-    #$DataSet.Tables[0] | Export-Csv "$ResultsDirectory/$ResultsFile" -NoTypeInformation -Encoding UTF8 -Delimiter ","
-	foreach ($row in $DataSet.Tables[0].Rows)
-		{ 
-  		$Test = $row[0].ToString().Trim()
-		Write-Host $Test
-  		}  
+    $DataSet.Tables[0] | Export-Csv "$ResultsDirectory/$ResultsFile" -NoTypeInformation -Encoding UTF8 -Delimiter ","
+	#foreach ($row in $DataSet.Tables[0].Rows)
+		#{ 
+  		#$Test = $row[0].ToString().Trim()
+		#Write-Host $Test
+  		#}  
 	
 	Write-Host "Complete: $RowsAffected rows returned" -ForegroundColor "Green"
   }

@@ -1,0 +1,16 @@
+In Visual Studio Code... Type 
+
+$Profile
+
+Cntrol-Click the retrun to edit the file in Visual Studio Code.
+
+Add the following lines to the profile 
+
+set-location C:\Users\shawn.mcmillian\Documents\Git\Database-Administration\PowerShell\Modules\Deeb
+$env:PSModulePath = $env:PSModulePath + ";C:\Users\shawn.mcmillian\Documents\Git\Database-Administration\PowerShell\Modules\Deeb"
+Import-Module -Name C:\Users\shawn.mcmillian\Documents\Git\Database-Administration\PowerShell\Modules\Deeb 
+
+
+Cntrol-S to save.
+
+Close Visual Studio code. Re-open and Deeb should load right up.
