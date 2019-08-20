@@ -52,8 +52,8 @@ DECLARE @TableName nvarchar(256),
 --*************************************************************************************
 --****								Change me!!  								   ****
 --*************************************************************************************
-SET @TableName = '[dbo].[Distributor]'
-SET @DataStatement = 'SELECT ROW_NUMBER() OVER (ORDER BY DistributorID) AS ROW_NUMBER,* INTO ##InsertScriptor FROM [Docusign].[dbo].[Distributor] WHERE DistributorCode LIKE ''2016%'''
+SET @TableName = '[dbo].[UserGroup]'
+SET @DataStatement = 'SELECT ROW_NUMBER() OVER (ORDER BY UserGroupId) AS ROW_NUMBER,* INTO ##InsertScriptor FROM [DBAdmin].[dbo].[UserGroup]'
 
 --*************************************************************************************
 --****					     Construct the temp table   						   ****
