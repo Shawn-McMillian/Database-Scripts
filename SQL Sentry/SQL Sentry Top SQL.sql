@@ -34,25 +34,40 @@ GO
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED ;
 
 --Set the loacal variables for the script
-DECLARE @EventSourceConnectionID int, 
-		@start datetime, 
+DECLARE @start datetime, 
 		@end datetime;
  
+IF(OBJECT_ID('tempdb.dbo.#EventSourceConnection') IS NULL)
+	BEGIN
+	CREATE TABLE #EventSourceConnection (EventSourceConnectionID smallint NOT NULL, ObjectName nvarchar(256))
+	END
+ELSE
+	BEGIN
+	TRUNCATE TABLE #EventSourceConnection
+	END
+	
 --*************************************************************************************
 --****								Change me!!  								   ****
 --*************************************************************************************
-SELECT	@EventSourceConnectionID = ID, 
-		@start = DATEADD(minute,-10,GETDATE()),  --NOT UTC unless you change the predicate below.
-		@end = GETDATE()
+INSERT INTO #EventSourceConnection( EventSourceConnectionID, ObjectName)
+SELECT	DISTINCT
+		ID AS [EventSourceConnectionID], 
+		ObjectName
 FROM [dbo].[EventSourceConnection]
-WHERE ObjectName LIKE N'CHNA2DB1A%';
+WHERE ObjectName LIKE N'%SEN0%'
+AND IsWatched = 1;
 
-
+SELECT	@start = DATEADD(hour,-2,GETDATE()),  --NOT UTC unless you change the predicate below.
+		@end = GETDATE()
+		--@start = '2019-07-23 13:00:00.000' 
+		--@end = '2019-07-23 14:00:00.000'
+		
  --*************************************************************************************
 --****								Return the results  							****
 --**************************************************************************************
 SELECT	ESC.ObjectName, 
 		PAD.TextData AS [QueryText],
+		--REPLACE(REPLACE(REPLACE(PAD.TextData,CHAR(10),''),CHAR(13),''),CHAR(9),'') AS [QueryTextNoCRLF],
 		PAD.ApplicationName,
 		PAD.DatabaseName,
 		PAD.HostName,
@@ -96,12 +111,24 @@ SELECT	ESC.ObjectName,
 FROM [dbo].[PerformanceAnalysisTraceData] AS PAD
 	JOIN [dbo].[EventSourceConnection] AS ESC ON PAD.EventSourceConnectionID = ESC.ID
 WHERE Duration > 1000
-AND EventSourceConnectionID = @EventSourceConnectionID 
+AND EventSourceConnectionID IN (SELECT EventSourceConnectionID FROM #EventSourceConnection)
 AND StartTime >= @start AND StartTime <= @end
 AND EndTime >= @start AND EndTime <= @end
+--AND PAD.ObjectName <> ''
+--AND PAD.ObjectName LIKE '%ExportRecipientEvent%' ESCAPE '|'
+--AND PAD.ObjectName LIKE '%TemplateSelectByAccountIdIncludeFolderTypeForAutoMatch%' ESCAPE '|'
+--AND PAD.TextData LIKE '%exec sp_executesql%'
+--AND PAD.TextData LIKE '%@counterId=4156888844864549337%'
+--AND PAD.GrantedQueryMemoryKB > 100
+--AND PAD.TextData LIKE '%@SendingUserId=NULL%'
+--AND PAD.TextData LIKE '%@RecipientUserId=NULL%'
+--AND PAD.TextData LIKE '%@EnvelopeStatusLookupId=default%'
+--AND PAD.TextData LIKE '%@CustomFields=1%'
 ORDER BY Duration DESC
 --ORDER BY CPU DESC
 --ORDER BY Reads DESC
 --ORDER BY Writes DESC
-
-
+--ORDER BY PAD.EndTime
+--ORDER BY GrantedMemoryKB DESC
+--ORDER BY StartTime DESC
+--ORDER BY [GrantedQueryMemoryMB] DESC
