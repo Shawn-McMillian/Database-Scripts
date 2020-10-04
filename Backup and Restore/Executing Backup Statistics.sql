@@ -22,7 +22,8 @@
 ** 
 *******************************************************************************
 */
-SELECT	command, 
+SELECT	DB_NAME(database_id) AS [DatabaseName],
+		command, 
 		percent_complete,
 		total_elapsed_time / 60000.0 AS [Elapsed],
 		estimated_completion_time / 60000.0 AS [remaining]
