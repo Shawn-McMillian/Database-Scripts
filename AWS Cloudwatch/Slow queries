@@ -1,3 +1,4 @@
+#Find the queries having the largest impact on the systems over the given period.
 fields @timestamp, @message
 | filter @message like "duration:"
 | parse @message "):*:" as User
@@ -7,4 +8,10 @@ fields @timestamp, @message
 | display bin(1d) as Date, User, QueryDurationMs, ShortQuery, WholeQuery
 | stats avg(QueryDurationMs) as AvgQueryDurationMs, min(QueryDurationMs) as minQueryDurationMs, max(QueryDurationMs) as maxQueryDurationMs, count() as GroupCount by Date, User, ShortQuery
 | fields AvgQueryDurationMs * GroupCount as ImpactScore
+#| filter ShortQuery like "SELECT" #Filter by query
+#| filter User like "dlo_web_ro@crop_web" #filter by user
+#| filter AvgQueryDurationMs > "50000" #filter by Avg Duration
+#| filter MinQueryDurationMs > "50000" #filter by Min Duration
+#| filter MaxQueryDurationMs > "50000" #filter by Max Duration
+#| filter ImpactScore > "50000" #filter by ImpactScore
 | sort ImpactScore desc

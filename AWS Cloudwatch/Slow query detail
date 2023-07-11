@@ -1,0 +1,12 @@
+#Get drill down details after getting something to drill into from the performance list
+fields @timestamp, @message
+| filter @message like "duration:"
+| parse @message "):*:" as User
+| parse @message "duration: * ms*" as QueryDurationMs
+| parse @message "statement: *" as WholeQuery
+| fields substr(WholeQuery,0,39) as ShortQuery
+| display bin(1d) as Date, User, QueryDurationMs, WholeQuery
+#| filter ShortQuery like "SELECT" #Filter by query
+#| filter User like "dlo_web_ro@crop_web" #filter by user
+#| filter QueryDurationMs > "50000" #filter by Query duration
+| sort ImpactScore desc
