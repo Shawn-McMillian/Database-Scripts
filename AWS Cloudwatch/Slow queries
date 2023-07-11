@@ -1,0 +1,10 @@
+fields @timestamp, @message
+| filter @message like "duration:"
+| parse @message "):*:" as User
+| parse @message "duration: * ms*" as QueryDurationMs
+| parse @message "statement: *" as WholeQuery
+| fields substr(WholeQuery,0,39) as ShortQuery
+| display bin(1d) as Date, User, QueryDurationMs, ShortQuery, WholeQuery
+| stats avg(QueryDurationMs) as AvgQueryDurationMs, min(QueryDurationMs) as minQueryDurationMs, max(QueryDurationMs) as maxQueryDurationMs, count() as GroupCount by Date, User, ShortQuery
+| fields AvgQueryDurationMs * GroupCount as ImpactScore
+| sort ImpactScore desc
