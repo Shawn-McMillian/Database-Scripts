@@ -1,0 +1,47 @@
+/*
+*******************************************************************************
+**         Intellectual property of Shawn McMillian, All rights reserved.
+**         This computer program is protected by copyright law
+**         and international treaties.
+*******************************************************************************
+**
+** Script Name: Index details
+**
+** Created By:  Shawn McMillian
+**
+** Description: Get all of the details for the tables in the database. 
+**
+** Databases:   Common
+**
+** Revision History:
+** ------------------------------------------------------------------------------------------------------
+** Date							Name					Description
+** ---------------------------- ----------------------- -------------------------------------------------
+** July 11 2023					Shawn McMillian			Initial script creation.
+*******************************************************************************
+** 
+*******************************************************************************
+*/
+SELECT 	N.nspname AS SchemaName,
+		C.relname AS TableName,
+    	C1.relname AS IndexName,
+    	AM.amname AS IndexType,
+		case IX.indisunique when 'f' then 'NO' else 'YES' end UNIQUENESS,
+		case IX.indisprimary when 'f' then 'NO' else 'YES' end IS_PRIMARY,
+		case IX.indisclustered when 'f' then 'NO' else 'YES' end IS_CLUSTERED,
+		case IX.indisvalid when 'f' then 'NO' else 'YES' end IS_VALID,
+    	A.attname as columnname
+FROM pg_class AS C
+	JOIN pg_namespace AS N ON C.relnamespace = N.oid
+	JOIN pg_index AS IX ON C.oid = IX.indrelid
+	JOIN pg_class AS C1 ON IX.indexrelid = C1.oid
+	JOIN pg_am AS AM ON C.relam = AM.oid
+	JOIN pg_attribute AS A ON C.oid = A.attrelid
+WHERE C.relkind = 'r' --Tables
+AND N.nspname NOT IN('pg_catalog','information_schema','pglogical')
+AND A.attnum = ANY(IX.indkey)
+--AND C1.relname not in (SELECT conname FROM pg_constraint)
+--AND  C.relname = 'mytable'
+--AND    N.nspname = 'myschema'
+ORDER BY SchemaName asc, TableName asc, IndexName asc;
+
