@@ -35,8 +35,8 @@ SELECT 	schemaname AS SchemaName,
 		autoanalyze_count  
 FROM pg_stat_user_tables
 WHERE seq_scan > 0
-AND relname = 'app_persistedtechnicalvariant'
-ORDER BY seq_tup_read DESC 
+--AND relname = 'app_persistedtechnicalvariant'
+ORDER BY seq_scan DESC 
 LIMIT 25;
 
 --Find indexes that are not being used.
@@ -62,7 +62,7 @@ SELECT 	userid::regrole AS UserName,
 		calls AS NumCalls,
 		query
 FROM pg_stat_statements AS SS
-ORDER BY mean_time DESC
+ORDER BY PercentOfTotalTime DESC
 LIMIT 10;
 
 --Find I/O intensive queries
