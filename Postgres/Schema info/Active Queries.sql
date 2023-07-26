@@ -36,7 +36,8 @@ SELECT
 	wait_event,
 	query
 FROM pg_stat_activity
-WHERE (now() - pg_stat_activity.query_start) > interval '1 minutes';
+WHERE (now() - pg_stat_activity.query_start) > interval '1 minutes'
+ORDER BY query_time desc
 
 --Find blocking processes
 SELECT
